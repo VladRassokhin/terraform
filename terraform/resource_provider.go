@@ -189,6 +189,42 @@ type DataSource struct {
 	SchemaAvailable bool
 }
 
+type SchemaElement struct {
+	// One of "ValueType" or "SchemaElements" or "SchemaInfo"
+	Type string `json:",omitempty"`
+	// Set for simple types (from ValueType)
+	Value string `json:",omitempty"`
+	// Set if Type == "SchemaElements"
+	ElementsType string `json:",omitempty"`
+	// Set if Type == "SchemaInfo"
+	Info SchemaInfo `json:",omitempty"`
+}
+
+type SchemaDefinition struct {
+	Type          string `json:",omitempty"`
+	Optional      bool   `json:",omitempty"`
+	Required      bool   `json:",omitempty"`
+	Description   string `json:",omitempty"`
+	InputDefault  string `json:",omitempty"`
+	Computed      bool   `json:",omitempty"`
+	MaxItems      int    `json:",omitempty"`
+	MinItems      int    `json:",omitempty"`
+	PromoteSingle bool   `json:",omitempty"`
+	DefaultFunc   string `json:",omitempty"`
+
+	ComputedWhen  []string `json:",omitempty"`
+	ConflictsWith []string `json:",omitempty"`
+
+	Deprecated string `json:",omitempty"`
+	Removed    string `json:",omitempty"`
+
+	Default *SchemaElement `json:",omitempty"`
+	Elem    *SchemaElement `json:",omitempty"`
+}
+
+type SchemaInfo map[string]SchemaDefinition
+type SchemaInfoWithTimeouts map[string]interface{}
+
 // ResourceProviderFactory is a function type that creates a new instance
 // of a resource provider.
 type ResourceProviderFactory func() (ResourceProvider, error)

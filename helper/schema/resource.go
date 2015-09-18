@@ -4,10 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"reflect"
 	"strconv"
 
 	"github.com/hashicorp/terraform/terraform"
 	"github.com/zclconf/go-cty/cty"
+	"strings"
+	"time"
 )
 
 var ReservedDataSourceFields = []string{
@@ -778,6 +781,40 @@ func (r *Resource) TestResourceData() *ResourceData {
 // of the receiving Resource.
 func (r *Resource) SchemasForFlatmapPath(path string) []*Schema {
 	return SchemasForFlatmapPath(path, r.Schema)
+}
+
+// ExportSchema should be called to export the structure
+// of the resource.
+//
+// Provider.ExportSchema() will automatically call this for all of
+// the resources it manages, so you don't need to call this manually if it
+// is part of a Provider.
+func (r *Resource) ExportWithTimeouts() terraform.SchemaInfoWithTimeouts {
+	info := schemaMap(r.Schema).Export()
+
+	var timeouts []string
+	if t := r.Timeouts; t != nil {
+		tp := reflect.ValueOf(*t)
+		for i := 0; i < tp.NumField(); i++ {
+			field := tp.Type().Field(i)
+			val := tp.Field(i)
+			if field.Type == reflect.PtrTo(reflect.TypeOf(time.Nanosecond)) && !val.IsNil() {
+				timeouts = append(timeouts, strings.ToLower(field.Name))
+			}
+		}
+	}
+	result := make(terraform.SchemaInfoWithTimeouts)
+	for nk, nv := range info {
+		result[nk] = nv
+	}
+	if len(timeouts) > 0 {
+		result["__timeouts__"] = timeouts
+	}
+	return result
+}
+
+func (r *Resource) Export() terraform.SchemaInfo {
+	return schemaMap(r.Schema).Export()
 }
 
 // Returns true if the resource is "top level" i.e. not a sub-resource.
