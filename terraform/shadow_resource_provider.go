@@ -276,6 +276,17 @@ func (p *shadowResourceProviderReal) ReadDataApply(
 	return result, err
 }
 
+func (p *shadowResourceProviderReal) Export() (*ResourceProviderSchema, error) {
+	result, err := p.ResourceProvider.Export()
+
+	p.Shared.Export.SetValue(&shadowResourceProviderExport{
+		Schema: result,
+		Result: err,
+	})
+
+	return result, err
+}
+
 // shadowResourceProviderShadow is the shadow resource provider. Function
 // calls never affect real resources. This is paired with the "real" side
 // which must be called properly to enable recording.
@@ -305,6 +316,7 @@ type shadowResourceProviderShared struct {
 	ValidateDataSource shadow.KeyedValue
 	ReadDataDiff       shadow.KeyedValue
 	ReadDataApply      shadow.KeyedValue
+	Export             shadow.Value
 }
 
 func (p *shadowResourceProviderShared) Close() error {
@@ -734,6 +746,26 @@ func (p *shadowResourceProviderShadow) ReadDataApply(
 	return result.Result, result.ResultErr
 }
 
+func (p *shadowResourceProviderShadow) Export() (*ResourceProviderSchema, error) {
+	// Get the result of the call
+	raw := p.Shared.Export.Value()
+	if raw == nil {
+		return nil, nil
+	}
+
+	result, ok := raw.(*shadowResourceProviderExport)
+	if !ok {
+		p.ErrorLock.Lock()
+		defer p.ErrorLock.Unlock()
+		p.Error = multierror.Append(p.Error, fmt.Errorf(
+			"Unknown 'export' shadow value: %#v", raw))
+		return nil, nil
+	}
+
+	// Return the results
+	return result.Schema, result.Result
+}
+
 func (p *shadowResourceProviderShadow) ImportState(info *InstanceInfo, id string) ([]*InstanceState, error) {
 	panic("import not supported by shadow graph")
 }
@@ -812,4 +844,9 @@ type shadowResourceProviderReadDataApply struct {
 	Diff      *InstanceDiff
 	Result    *InstanceState
 	ResultErr error
+}
+
+type shadowResourceProviderExport struct {
+	Schema *ResourceProviderSchema
+	Result error
 }

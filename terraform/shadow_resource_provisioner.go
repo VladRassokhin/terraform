@@ -116,6 +116,16 @@ func (p *shadowResourceProvisionerReal) Stop() error {
 	return p.ResourceProvisioner.Stop()
 }
 
+func (p *shadowResourceProvisionerReal) Export() (*ResourceProvisionerSchema, error) {
+	res, err := p.ResourceProvisioner.Export()
+	p.Shared.Export.SetValue(&shadowResourceProvisionerExport{
+		Schema:    res,
+		ResultErr: err,
+	})
+
+	return res, err
+}
+
 // shadowResourceProvisionerShadow is the shadow resource provisioner. Function
 // calls never affect real resources. This is paired with the "real" side
 // which must be called properly to enable recording.
@@ -134,6 +144,7 @@ type shadowResourceProvisionerShared struct {
 	Validate  shadow.ComparedValue
 	Apply     shadow.KeyedValue
 	ApplyLock sync.Mutex // For writing only
+	Export    shadow.Value
 }
 
 func (p *shadowResourceProvisionerShared) Close() error {
@@ -239,6 +250,27 @@ func (p *shadowResourceProvisionerShadow) Stop() error {
 	return nil
 }
 
+func (p *shadowResourceProvisionerShadow) Export() (*ResourceProvisionerSchema, error) {
+	// Get the result of the validate call
+	raw := p.Shared.Export.Value()
+	if raw == nil {
+		return nil, nil
+	}
+
+	result, ok := raw.(*shadowResourceProvisionerExport)
+	if !ok {
+		p.ErrorLock.Lock()
+		defer p.ErrorLock.Unlock()
+		p.Error = multierror.Append(p.Error, fmt.Errorf(
+			"Unknown 'export' shadow value: %#v", raw))
+		return nil, nil
+	}
+
+	// We don't need to compare configurations because we key on the
+	// configuration so just return right away.
+	return result.Schema, result.ResultErr
+}
+
 // The structs for the various function calls are put below. These structs
 // are used to carry call information across the real/shadow boundaries.
 
@@ -250,6 +282,11 @@ type shadowResourceProvisionerValidate struct {
 
 type shadowResourceProvisionerApply struct {
 	Config    *ResourceConfig
+	ResultErr error
+}
+
+type shadowResourceProvisionerExport struct {
+	Schema    *ResourceProvisionerSchema
 	ResultErr error
 }
 
