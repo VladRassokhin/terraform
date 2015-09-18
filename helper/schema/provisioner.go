@@ -203,3 +203,9 @@ func (p *Provisioner) Validate(c *terraform.ResourceConfig) (ws []string, es []e
 
 	return ws, es
 }
+
+func (p *Provisioner) Export() (*terraform.ResourceProvisionerSchema, error) {
+	result := new(terraform.ResourceProvisionerSchema)
+	result.Schema = schemaMap(p.Schema).Export()
+	return result, nil
+}

@@ -53,6 +53,9 @@ type ResourceProvisioner interface {
 	// stop somehow failed and that the user should expect potentially waiting
 	// a longer period of time.
 	Stop() error
+
+	// Export exports provisioner schema
+	Export() (*ResourceProvisionerSchema, error)
 }
 
 // ResourceProvisionerCloser is an interface that provisioners that can close
@@ -68,3 +71,7 @@ type ResourceProvisionerFactory func() (ResourceProvisioner, error)
 // ProvisionerFactory is a function type that creates a new instance
 // of a provisioners.Interface.
 type ProvisionerFactory = provisioners.Factory
+
+type ResourceProvisionerSchema struct {
+	Schema SchemaInfo `json:"schema"`
+}
