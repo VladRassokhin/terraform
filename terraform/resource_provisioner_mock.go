@@ -25,6 +25,11 @@ type MockResourceProvisioner struct {
 	StopCalled      bool
 	StopFn          func() error
 	StopReturnError error
+
+	ExportCalled      bool
+	ExportFn          func() (*ResourceProvisionerSchema, error)
+	ExportReturn      *ResourceProvisionerSchema
+	ExportReturnError error
 }
 
 func (p *MockResourceProvisioner) Validate(c *ResourceConfig) ([]string, []error) {
@@ -69,4 +74,13 @@ func (p *MockResourceProvisioner) Stop() error {
 	}
 
 	return p.StopReturnError
+}
+
+func (p *MockResourceProvisioner) Export() (*ResourceProvisionerSchema, error) {
+	p.ExportCalled = true
+	if p.ExportFn != nil {
+		return p.ExportFn()
+	}
+
+	return p.ExportReturn, p.ExportReturnError
 }
