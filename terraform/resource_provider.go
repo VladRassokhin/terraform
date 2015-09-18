@@ -168,6 +168,9 @@ type ResourceProvider interface {
 	// ReadDataApply initializes a data instance using the configuration
 	// in a diff produced by ReadDataDiff.
 	ReadDataApply(*InstanceInfo, *InstanceDiff) (*InstanceState, error)
+
+	// Export exports provider and resources schema
+	Export() (*ResourceProviderSchema, error)
 }
 
 // ResourceProviderError may be returned when creating a Context if the
@@ -190,8 +193,8 @@ type ResourceProviderCloser interface {
 
 // ResourceType is a type of resource that a resource provider can manage.
 type ResourceType struct {
-	Name       string // Name of the resource, example "instance" (no provider prefix)
-	Importable bool   // Whether this resource supports importing
+	Name       string `json:"name"`       // Name of the resource, example "instance" (no provider prefix)
+	Importable bool   `json:"importable"` // Whether this resource supports importing
 
 	// SchemaAvailable is set if the provider supports the ProviderSchema,
 	// ResourceTypeSchema and DataSourceSchema methods. Although it is
@@ -203,7 +206,7 @@ type ResourceType struct {
 
 // DataSource is a data source that a resource provider implements.
 type DataSource struct {
-	Name string
+	Name string `json:"name"`
 
 	// SchemaAvailable is set if the provider supports the ProviderSchema,
 	// ResourceTypeSchema and DataSourceSchema methods. Although it is
@@ -211,6 +214,24 @@ type DataSource struct {
 	// that's smuggled here only because that avoids a breaking change to
 	// the plugin protocol.
 	SchemaAvailable bool
+}
+
+type SchemaElement struct {
+	Name     string         `json:"name"`
+	Type     string         `json:"type"`
+	Value    string         `json:"value,omitempty"`
+	Elements SchemaElements `json:"elements,omitempty"`
+	Info     SchemaInfo     `json:"info,omitempty"`
+}
+
+type SchemaElements []SchemaElement
+
+type SchemaInfo map[string]SchemaElements
+
+// ResourceProviderSchema
+type ResourceProviderSchema struct {
+	Provider  SchemaInfo            `json:"provider"`
+	Resources map[string]SchemaInfo `json:"resources"`
 }
 
 // ResourceProviderResolver is an interface implemented by objects that are

@@ -42,6 +42,10 @@ type MockResourceProvider struct {
 	DiffFn                         func(*InstanceInfo, *InstanceState, *ResourceConfig) (*InstanceDiff, error)
 	DiffReturn                     *InstanceDiff
 	DiffReturnError                error
+	ExportCalled                   bool
+	ExportFn                       func() (*ResourceProviderSchema, error)
+	ExportReturn                   *ResourceProviderSchema
+	ExportReturnError              error
 	RefreshCalled                  bool
 	RefreshInfo                    *InstanceInfo
 	RefreshState                   *InstanceState
@@ -208,6 +212,18 @@ func (p *MockResourceProvider) Diff(
 	}
 
 	return p.DiffReturn.DeepCopy(), p.DiffReturnError
+}
+
+func (p *MockResourceProvider) Export() (*ResourceProviderSchema, error) {
+	p.Lock()
+	defer p.Unlock()
+
+	p.ExportCalled = true
+	if p.ExportFn != nil {
+		return p.ExportFn()
+	}
+
+	return p.ExportReturn, p.ExportReturnError
 }
 
 func (p *MockResourceProvider) Refresh(
