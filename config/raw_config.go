@@ -125,7 +125,7 @@ func (r *RawConfig) Interpolate(vs map[string]ast.Variable) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	config := langEvalConfig(vs)
+	config := LangEvalConfig(vs)
 	return r.interpolate(func(root ast.Node) (interface{}, error) {
 		// None of the variables we need are computed, meaning we should
 		// be able to properly evaluate.
@@ -316,8 +316,8 @@ type gobRawConfig struct {
 	Raw map[string]interface{}
 }
 
-// langEvalConfig returns the evaluation configuration we use to execute.
-func langEvalConfig(vs map[string]ast.Variable) *hil.EvalConfig {
+// LangEvalConfig returns the evaluation configuration we use to execute.
+func LangEvalConfig(vs map[string]ast.Variable) *hil.EvalConfig {
 	funcMap := make(map[string]ast.Function)
 	for k, v := range Funcs() {
 		funcMap[k] = v
