@@ -2392,7 +2392,7 @@ func TestInterpolateFuncUUID(t *testing.T) {
 			t.Fatalf("err: %s", err)
 		}
 
-		result, err := hil.Eval(ast, langEvalConfig(nil))
+		result, err := hil.Eval(ast, LangEvalConfig(nil))
 		if err != nil {
 			t.Fatalf("err: %s", err)
 		}
@@ -2412,7 +2412,7 @@ func TestInterpolateFuncTimestamp(t *testing.T) {
 		t.Fatalf("err: %s", err)
 	}
 
-	result, err := hil.Eval(ast, langEvalConfig(nil))
+	result, err := hil.Eval(ast, LangEvalConfig(nil))
 	if err != nil {
 		t.Fatalf("err: %s", err)
 	}
@@ -2446,7 +2446,7 @@ func testFunction(t *testing.T, config testFunctionConfig) {
 				t.Fatalf("unexpected parse error: %s", err)
 			}
 
-			result, err := hil.Eval(ast, langEvalConfig(config.Vars))
+			result, err := hil.Eval(ast, LangEvalConfig(config.Vars))
 			if err != nil != tc.Error {
 				t.Fatalf("unexpected eval error: %s", err)
 			}
@@ -2558,7 +2558,7 @@ func TestInterpolateFuncBcrypt(t *testing.T) {
 		t.Fatalf("err: %s", err)
 	}
 
-	result, err := hil.Eval(node, langEvalConfig(nil))
+	result, err := hil.Eval(node, LangEvalConfig(nil))
 	if err != nil {
 		t.Fatalf("err: %s", err)
 	}
