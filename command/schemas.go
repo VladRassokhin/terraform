@@ -2,6 +2,8 @@ package command
 
 import (
 	"flag"
+	"github.com/hashicorp/hil"
+	"github.com/hashicorp/hil/ast"
 	"strings"
 )
 
@@ -19,6 +21,24 @@ type resultBase struct {
 type errorResult struct {
 	resultBase
 	Error string `json:"error"`
+}
+
+type FunctionInfo struct {
+	Name         string
+	ArgTypes     []string
+	ReturnType   string
+	Variadic     bool   `json:",omitempty"`
+	VariadicType string `json:",omitempty"`
+}
+
+type functionSchema struct {
+	resultBase
+	FunctionInfo `json:"schema"`
+}
+
+type functionsSchema struct {
+	resultBase
+	Functions map[string]FunctionInfo `json:"schema"`
 }
 
 func (c *SchemasCommand) Run(args []string) int {
@@ -106,5 +126,65 @@ func (c *SchemasCommand) Synopsis() string {
 }
 
 func getAnythingOrErrorResult(name string) interface{} {
+	if name == "functions" {
+		return functionsSchema{resultBase{"functions", "functions"}, getInterpolationFunctions()}
+	}
+	s := getFunctionSchema(name)
+	if s != nil {
+		return s
+	}
 	return errorResult{resultBase{name, "unknown"}, "Not found"}
+}
+
+func getInterpolationFunctions() map[string]FunctionInfo {
+	vars := make(map[string]ast.Variable)
+	cfg := getLangEvalConfig(vars)
+	result := make(map[string]FunctionInfo)
+	for name, fun := range cfg.GlobalScope.FuncMap {
+		args := make([]string, len(fun.ArgTypes))
+		for i, at := range fun.ArgTypes {
+			args[i] = at.String()
+		}
+		vt := ""
+		if fun.Variadic {
+			vt = fun.VariadicType.String()
+		}
+		result[name] = FunctionInfo{name, args, fun.ReturnType.String(), fun.Variadic, vt}
+	}
+
+	return result
+}
+
+func getInterpolationFunction(name string) (*FunctionInfo, bool) {
+	vars := make(map[string]ast.Variable)
+	cfg := getLangEvalConfig(vars)
+	fm := cfg.GlobalScope.FuncMap
+	if fun, ok := fm[name]; ok {
+		args := make([]string, len(fun.ArgTypes))
+		for i, at := range fun.ArgTypes {
+			args[i] = at.String()
+		}
+		vt := ""
+		if fun.Variadic {
+			vt = fun.VariadicType.String()
+		}
+		return &FunctionInfo{name, args, fun.ReturnType.String(), fun.Variadic, vt}, true
+	}
+	return nil, false
+}
+
+func getLangEvalConfig(vars map[string]ast.Variable) hil.EvalConfig {
+	return hil.EvalConfig{
+		GlobalScope: &ast.BasicScope{
+			VarMap: vars,
+		},
+	}
+}
+
+func getFunctionSchema(name string) interface{} {
+	function, found := getInterpolationFunction(name)
+	if !found {
+		return nil
+	}
+	return functionSchema{resultBase{name, "function"}, *function}
 }
