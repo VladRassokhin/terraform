@@ -230,8 +230,9 @@ type SchemaInfo map[string]SchemaElements
 
 // ResourceProviderSchema
 type ResourceProviderSchema struct {
-	Provider  SchemaInfo            `json:"provider"`
-	Resources map[string]SchemaInfo `json:"resources"`
+	Provider    SchemaInfo            `json:"provider"`
+	Resources   map[string]SchemaInfo `json:"resources"`
+	DataSources map[string]SchemaInfo `json:"data-sources"`
 }
 
 // ResourceProviderResolver is an interface implemented by objects that are
