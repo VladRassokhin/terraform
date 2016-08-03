@@ -215,8 +215,9 @@ type SchemaInfo map[string]SchemaElements
 
 // ResourceProviderSchema
 type ResourceProviderSchema struct {
-	Provider  SchemaInfo            `json:"provider"`
-	Resources map[string]SchemaInfo `json:"resources"`
+	Provider    SchemaInfo            `json:"provider"`
+	Resources   map[string]SchemaInfo `json:"resources"`
+	DataSources map[string]SchemaInfo `json:"data-sources"`
 }
 // ResourceProviderFactory is a function type that creates a new instance
 // of a resource provider.
