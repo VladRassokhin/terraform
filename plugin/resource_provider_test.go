@@ -792,6 +792,36 @@ func TestResourceProvider_validateDataSource(t *testing.T) {
 	}
 }
 
+func TestResourceProvider_export(t *testing.T) {
+	p := new(terraform.MockResourceProvider)
+
+	// Create a mock provider
+	client, _ := plugin.TestPluginRPCConn(t, pluginMap(&ServeOpts{
+		ProviderFunc: testProviderFixed(p),
+	}))
+	defer client.Close()
+
+	// Request the provider
+	raw, err := client.Dispense(ProviderPluginName)
+	if err != nil {
+		t.Fatalf("err: %s", err)
+	}
+	provider := raw.(terraform.ResourceProvider)
+
+	p.ExportReturn = new(terraform.ResourceProviderSchema)
+
+	schema, e := provider.Export()
+	if !p.ExportCalled {
+		t.Fatal("export should be called")
+	}
+	if e != nil {
+		t.Fatalf("bad: %#v", e)
+	}
+	if !reflect.DeepEqual(schema, p.ExportReturn) {
+		t.Fatalf("bad: %#v", schema)
+	}
+}
+
 func TestResourceProvider_close(t *testing.T) {
 	p := new(terraform.MockResourceProvider)
 
