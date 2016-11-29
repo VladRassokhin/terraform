@@ -246,3 +246,33 @@ func TestResourceProvisioner_close(t *testing.T) {
 		t.Fatal("should have error")
 	}
 }
+
+func TestResourceProvisioner_export(t *testing.T) {
+	// Create a mock provider
+	p := new(terraform.MockResourceProvisioner)
+	client, _ := plugin.TestPluginRPCConn(t, pluginMap(&ServeOpts{
+		ProvisionerFunc: testProvisionerFixed(p),
+	}))
+	defer client.Close()
+
+	// Request the provider
+	raw, err := client.Dispense(ProvisionerPluginName)
+	if err != nil {
+		t.Fatalf("err: %s", err)
+	}
+	provisioner := raw.(terraform.ResourceProvisioner)
+
+	expected := new(terraform.ResourceProvisionerSchema)
+	p.ExportReturn = expected
+
+	schema, err := provisioner.Export()
+	if err != nil {
+		t.Fatalf("bad: %#v", err)
+	}
+	if !p.ExportCalled {
+		t.Fatal("export should be called")
+	}
+	if !reflect.DeepEqual(schema, expected) {
+		t.Fatalf("bad: %#v", schema)
+	}
+}
