@@ -3,8 +3,11 @@ package command
 import (
 	"flag"
 	"fmt"
+	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/hil/ast"
+	backendlocal "github.com/hashicorp/terraform/backend/local"
 	"github.com/hashicorp/terraform/config"
+	"github.com/hashicorp/terraform/plugin/discovery"
 	"github.com/hashicorp/terraform/terraform"
 	"strings"
 )
@@ -70,7 +73,10 @@ func (c *SchemasCommand) Run(args []string) int {
 	var inXml bool
 	var expectedType string
 
-	args = c.Meta.process(args, false)
+	args, err := c.Meta.process(args, false)
+	if err != nil {
+		return 1
+	}
 
 	cmdFlags := flag.NewFlagSet("schemas", flag.ContinueOnError)
 	cmdFlags.BoolVar(&indent, "indent", false, "Indent output")
@@ -112,7 +118,19 @@ func (c *SchemasCommand) Run(args []string) int {
 	}
 
 	var s interface{}
-	s = getOrErrorResult(c.Meta.ContextOpts, args[0], expectedType)
+	b, err := c.Backend(&BackendOpts{
+		ForceLocal: true,
+	})
+	if err != nil {
+		c.Ui.Error(fmt.Sprintf("Failed to load backend: %s", err))
+		return 1
+	}
+	localBackend, ok := b.(*backendlocal.Local)
+	if !ok {
+		c.Ui.Error(fmt.Sprintf("Failed to load backend: %s", err))
+		return 1
+	}
+	s = getOrErrorResult(localBackend.ContextOpts, args[0], expectedType)
 
 	c.Ui.Output(FormatSchema(&FormatSchemaOpts{
 		Name:      args[0],
@@ -161,11 +179,11 @@ func getOrErrorResult(context *terraform.ContextOpts, name string, expectedType 
 	case "function":
 		s = getFunctionSchema(name)
 	case "provider":
-		s, e = getProviderSchema(context.Providers, name)
+		s, e = getProviderSchema(context.ProviderResolver, name)
 	case "resource":
-		s, e = getResourceSchema(context.Providers, name)
+		s, e = getResourceSchema(context.ProviderResolver, name)
 	case "data-source":
-		s, e = getDataSourceSchema(context.Providers, name)
+		s, e = getDataSourceSchema(context.ProviderResolver, name)
 	case "provisioner":
 		s, e = getProvisionerSchema(context.Provisioners, name)
 	case "any":
@@ -191,19 +209,19 @@ func getAnythingOrErrorResult(context *terraform.ContextOpts, name string) inter
 	}
 	var a interface{}
 	var e error
-	a, e = getProviderSchema(context.Providers, name)
+	a, e = getProviderSchema(context.ProviderResolver, name)
 	if e != nil {
 		return errorResult{resultBase{name, "provider"}, e.Error()}
 	} else if a != nil {
 		return a
 	}
-	a, e = getResourceSchema(context.Providers, name)
+	a, e = getResourceSchema(context.ProviderResolver, name)
 	if e != nil {
 		return errorResult{resultBase{name, "resource"}, e.Error()}
 	} else if a != nil {
 		return a
 	}
-	a, e = getDataSourceSchema(context.Providers, name)
+	a, e = getDataSourceSchema(context.ProviderResolver, name)
 	if e != nil {
 		return errorResult{resultBase{name, "data-source"}, e.Error()}
 	} else if a != nil {
@@ -263,7 +281,33 @@ func getFunctionSchema(name string) interface{} {
 	return functionSchema{resultBase{name, "function"}, *function}
 }
 
-func getProviderSchema(providers map[string]terraform.ResourceProviderFactory, name string) (interface{}, error) {
+func getProvider(resolver terraform.ResourceProviderResolver, name string) (map[string]terraform.ResourceProviderFactory, error) {
+	req := make(discovery.PluginRequirements)
+	req[name] = &discovery.PluginConstraints{
+		Versions: discovery.Constraints{},
+	}
+	providers, err := resolver.ResolveProviders(req)
+	if err != nil {
+		return nil, &multierror.Error{
+			Errors: err,
+		}
+	}
+	return providers, nil
+}
+
+func getProviderName(name string) string {
+	i := strings.Index(name, "_")
+	if i == -1 {
+		return name
+	}
+	return name[0:i]
+}
+
+func getProviderSchema(resolver terraform.ResourceProviderResolver, name string) (interface{}, error) {
+	providers, err := getProvider(resolver, name)
+	if err != nil {
+		return nil, err
+	}
 	for k, v := range providers {
 		if name != k {
 			continue
@@ -280,7 +324,11 @@ func getProviderSchema(providers map[string]terraform.ResourceProviderFactory, n
 	return nil, nil
 }
 
-func getResourceSchema(providers map[string]terraform.ResourceProviderFactory, name string) (interface{}, error) {
+func getResourceSchema(resolver terraform.ResourceProviderResolver, name string) (interface{}, error) {
+	providers, err := getProvider(resolver, getProviderName(name))
+	if err != nil {
+		return nil, err
+	}
 	for k, v := range providers {
 		if provider, err := v(); err == nil {
 			resources := provider.Resources()
@@ -300,7 +348,11 @@ func getResourceSchema(providers map[string]terraform.ResourceProviderFactory, n
 	return nil, nil
 }
 
-func getDataSourceSchema(providers map[string]terraform.ResourceProviderFactory, name string) (interface{}, error) {
+func getDataSourceSchema(resolver terraform.ResourceProviderResolver, name string) (interface{}, error) {
+	providers, err := getProvider(resolver, getProviderName(name))
+	if err != nil {
+		return nil, err
+	}
 	for k, v := range providers {
 		if provider, err := v(); err == nil {
 			data_sources := provider.DataSources()
@@ -338,29 +390,29 @@ func getProvisionerSchema(providers map[string]terraform.ResourceProvisionerFact
 }
 
 func getAllNames(context *terraform.ContextOpts, name string) []string {
-	if name == "providers" {
-		return getAllProviders(context)
-	}
+	//if name == "providers" {
+	//	return getAllProviders(context)
+	//}
 	if name == "provisioners" {
 		return getAllProvisioners(context)
 	}
-	if name == "resources" {
-		return getAllResources(context)
-	}
-	if name == "data-sources" {
-		return getAllDataSources(context)
-	}
+	//if name == "resources" {
+	//	return getAllResources(context)
+	//}
+	//if name == "data-sources" {
+	//	return getAllDataSources(context)
+	//}
 	return nil
 }
 
-func getAllProviders(context *terraform.ContextOpts) []string {
-	providers := context.Providers
-	result := make([]string, 0, len(providers))
-	for name := range providers {
-		result = append(result, name)
-	}
-	return result
-}
+//func getAllProviders(context *terraform.ContextOpts) []string {
+//	providers := context.Providers
+//	result := make([]string, 0, len(providers))
+//	for name := range providers {
+//		result = append(result, name)
+//	}
+//	return result
+//}
 
 func getAllProvisioners(context *terraform.ContextOpts) []string {
 	provisioners := context.Provisioners
@@ -371,29 +423,29 @@ func getAllProvisioners(context *terraform.ContextOpts) []string {
 	return result
 }
 
-func getAllResources(context *terraform.ContextOpts) []string {
-	providers := context.Providers
-	result := make([]string, 0)
-	for _, v := range providers {
-		if provider, err := v(); err == nil {
-			resources := provider.Resources()
-			for _, r := range resources {
-				result = append(result, r.Name)
-			}
-		}
-	}
-	return result
-}
-func getAllDataSources(context *terraform.ContextOpts) []string {
-	providers := context.Providers
-	result := make([]string, 0)
-	for _, v := range providers {
-		if provider, err := v(); err == nil {
-			sources := provider.DataSources()
-			for _, ds := range sources {
-				result = append(result, ds.Name)
-			}
-		}
-	}
-	return result
-}
+//func getAllResources(context *terraform.ContextOpts) []string {
+//	providers := context.Providers
+//	result := make([]string, 0)
+//	for _, v := range providers {
+//		if provider, err := v(); err == nil {
+//			resources := provider.Resources()
+//			for _, r := range resources {
+//				result = append(result, r.Name)
+//			}
+//		}
+//	}
+//	return result
+//}
+//func getAllDataSources(context *terraform.ContextOpts) []string {
+//	providers := context.Providers
+//	result := make([]string, 0)
+//	for _, v := range providers {
+//		if provider, err := v(); err == nil {
+//			sources := provider.DataSources()
+//			for _, ds := range sources {
+//				result = append(result, ds.Name)
+//			}
+//		}
+//	}
+//	return result
+//}
