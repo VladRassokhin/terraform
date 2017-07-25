@@ -194,16 +194,34 @@ type DataSource struct {
 }
 
 type SchemaElement struct {
-	Name     string         `json:"name"`
-	Type     string         `json:"type"`
-	Value    string         `json:"value,omitempty"`
-	Elements SchemaElements `json:"elements,omitempty"`
-	Info     SchemaInfo     `json:"info,omitempty"`
+	Type         string     `json:"type,omitempty"`
+	Value        string     `json:"value,omitempty"`
+	ElementsType string     `json:"elements-type,omitempty"`
+	Info         SchemaInfo `json:"info,omitempty"`
 }
 
-type SchemaElements []SchemaElement
+type SchemaDefinition struct {
+	Type          string `json:",omitempty"`
+	Optional      bool   `json:",omitempty"`
+	Required      bool   `json:",omitempty"`
+	Description   string `json:",omitempty"`
+	InputDefault  string `json:",omitempty"`
+	Computed      bool   `json:",omitempty"`
+	MaxItems      int    `json:",omitempty"`
+	MinItems      int    `json:",omitempty"`
+	PromoteSingle bool   `json:",omitempty"`
 
-type SchemaInfo map[string]SchemaElements
+	ComputedWhen  []string `json:",omitempty"`
+	ConflictsWith []string `json:",omitempty"`
+
+	Deprecated string `json:",omitempty"`
+	Removed    string `json:",omitempty"`
+
+	Default SchemaElement `json:",omitempty"`
+	Elem    SchemaElement `json:",omitempty"`
+}
+
+type SchemaInfo map[string]SchemaDefinition
 
 // ResourceProviderSchema
 type ResourceProviderSchema struct {
