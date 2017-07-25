@@ -50,7 +50,7 @@ type Schema struct {
 	//   TypeMap - map[string]interface{}
 	//   TypeSet - *schema.Set
 	//
-	Type ValueType `export:""`
+	Type ValueType
 
 	// If one of these is set, then this item can come from the configuration.
 	// Both cannot be set. If Optional is set, the value is optional. If
@@ -58,8 +58,8 @@ type Schema struct {
 	//
 	// One of these must be set if the value is not computed. That is:
 	// value either comes from the config, is computed, or is both.
-	Optional bool `export:""`
-	Required bool `export:""`
+	Optional bool
+	Required bool
 
 	// If this is non-nil, the provided function will be used during diff
 	// of this field. If this is nil, a default diff for the type of the
@@ -92,18 +92,18 @@ type Schema struct {
 	//
 	// If either of these is set, then the user won't be asked for input
 	// for this key if the default is not nil.
-	Default     interface{} `export:""`
+	Default     interface{}
 	DefaultFunc SchemaDefaultFunc
 
 	// Description is used as the description for docs or asking for user
 	// input. It should be relatively short (a few sentences max) and should
 	// be formatted to fit a CLI.
-	Description string `export:""`
+	Description string
 
 	// InputDefault is the default value to use for when inputs are requested.
 	// This differs from Default in that if Default is set, no input is
 	// asked for. If Input is asked, this will be the default value offered.
-	InputDefault string `export:""`
+	InputDefault string
 
 	// The fields below relate to diffs.
 	//
@@ -117,7 +117,7 @@ type Schema struct {
 	// storing it in the state (and likewise before comparing for diffs).
 	// The use for this is for example with large strings, you may want
 	// to simply store the hash of it.
-	Computed  bool `export:""`
+	Computed  bool
 	ForceNew  bool
 	StateFunc SchemaStateFunc
 
@@ -128,7 +128,7 @@ type Schema struct {
 	// *Resource. If it is *Schema, the element type is just a simple value.
 	// If it is *Resource, the element type is a complex structure,
 	// potentially with its own lifecycle.
-	Elem interface{} `export:""`
+	Elem interface{}
 
 	// The following fields are only set for a TypeList or TypeSet.
 	//
@@ -175,7 +175,7 @@ type Schema struct {
 	// A deprecated field still works, but will probably stop working in near
 	// future. This string is the message shown to the user with instructions on
 	// how to address the deprecation.
-	Deprecated string `export:""`
+	Deprecated string
 
 	// When Removed is set, this attribute has been removed from the schema
 	//
@@ -183,7 +183,7 @@ type Schema struct {
 	// messages for the user when they show up in resource configurations.
 	// This string is the message shown to the user with instructions on
 	// what do to about the removed attribute.
-	Removed string `export:""`
+	Removed string
 
 	// ValidateFunc allows individual fields to define arbitrary validation
 	// logic. It is yielded the provided config value as an interface{} that is
@@ -771,47 +771,44 @@ func (m schemaMap) Export() terraform.SchemaInfo {
 
 var myDefaultSchema = Schema{}
 
-func export(v *Schema) terraform.SchemaElements {
-	item := terraform.SchemaElements{}
-	s := reflect.ValueOf(v).Elem()
-	dd := reflect.ValueOf(&myDefaultSchema).Elem()
-	typeOfV := s.Type()
-	typeOfDD := dd.Type()
-	for i := 0; i < typeOfV.NumField(); i++ {
-		field := typeOfV.Field(i)
-		name := field.Name
-		if _, ok := field.Tag.Lookup("export"); !ok {
-			continue
-		}
-		f := s.Field(i)
-		value := f.Interface()
-		defValue := dd.Field(i).Interface()
-		if typeOfDD != typeOfV || value != defValue {
-			el := exportValue(value, name, fmt.Sprintf("%s", f.Type()))
-			item = append(item, el)
-		}
+func export(v *Schema) terraform.SchemaDefinition {
+	item := terraform.SchemaDefinition{}
+
+	item.Type = fmt.Sprintf("%s", v.Type)
+	item.Optional = v.Optional
+	item.Required = v.Required
+	item.Description = v.Description
+	item.InputDefault = v.InputDefault
+	item.Computed = v.Computed
+	item.MaxItems = v.MaxItems
+	item.MinItems = v.MinItems
+	item.PromoteSingle = v.PromoteSingle
+	item.ComputedWhen = v.ComputedWhen
+	item.ConflictsWith = v.ConflictsWith
+	item.Deprecated = v.Deprecated
+	item.Removed = v.Removed
+
+	if v.Elem != nil {
+		item.Elem = exportValue(v.Elem, fmt.Sprintf("%T", v.Elem))
 	}
+
 	// TODO: Find better solution
 	if defValue, err := v.DefaultValue(); err == nil && defValue != nil && !reflect.DeepEqual(defValue, v.Default) {
-		el := exportValue(defValue, "DefaultValue_Computed", fmt.Sprintf("%T", defValue))
-		item = append(item, el)
+		item.Default = exportValue(defValue, fmt.Sprintf("%T", defValue))
 	}
 	return item
 }
 
-func exportValue(value interface{}, name string, t string) terraform.SchemaElement {
+func exportValue(value interface{}, t string) terraform.SchemaElement {
 	s2, ok := value.(*Schema)
 	if ok {
-		return terraform.SchemaElement{Name: name, Type: "SchemaElements", Elements: export(s2)}
+		return terraform.SchemaElement{Type: "SchemaElements", ElementsType: fmt.Sprintf("%s", s2.Type)}
 	}
 	r2, ok := value.(*Resource)
 	if ok {
-		return terraform.SchemaElement{Name: name, Type: "SchemaInfo", Info: r2.Export()}
+		return terraform.SchemaElement{Type: "SchemaInfo", Info: r2.Export()}
 	}
-	if value != nil {
-		return terraform.SchemaElement{Name: name, Type: t, Value: fmt.Sprintf("%v", value)}
-	}
-	return terraform.SchemaElement{Name: name, Type: t, Value: ""}
+	return terraform.SchemaElement{Type: t, Value: fmt.Sprintf("%v", value)}
 }
 
 
