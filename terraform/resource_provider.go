@@ -217,10 +217,10 @@ type DataSource struct {
 }
 
 type SchemaElement struct {
-	Type         string     `json:"type,omitempty"`
-	Value        string     `json:"value,omitempty"`
-	ElementsType string     `json:"elements-type,omitempty"`
-	Info         SchemaInfo `json:"info,omitempty"`
+	Type         string     `json:",omitempty"`
+	Value        string     `json:",omitempty"`
+	ElementsType string     `json:",omitempty"`
+	Info         SchemaInfo `json:",omitempty"`
 }
 
 type SchemaDefinition struct {
