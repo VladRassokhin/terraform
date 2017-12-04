@@ -914,7 +914,6 @@ func exportValue(value interface{}, t string) terraform.SchemaElement {
 	return terraform.SchemaElement{Type: t, Value: fmt.Sprintf("%v", value)}
 }
 
-
 func (m schemaMap) diff(
 	k string,
 	schema *Schema,
