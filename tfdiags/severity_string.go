@@ -9,6 +9,11 @@ const (
 	_Severity_name_1 = "Warning"
 )
 
+var (
+	_Severity_index_0 = [...]uint8{0, 5}
+	_Severity_index_1 = [...]uint8{0, 7}
+)
+
 func (i Severity) String() string {
 	switch {
 	case i == 69:

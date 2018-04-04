@@ -13,6 +13,8 @@ const (
 
 var (
 	_getSource_index_0 = [...]uint8{0, 14, 29}
+	_getSource_index_1 = [...]uint8{0, 13}
+	_getSource_index_2 = [...]uint8{0, 12}
 	_getSource_index_3 = [...]uint8{0, 18, 32}
 )
 

@@ -67,19 +67,6 @@ func (t *ResourceTimeout) ConfigDecode(s *Resource, c *terraform.ResourceConfig)
 				// loop through each Timeout given in the configuration and validate they
 				// the Timeout defined in the resource
 				for timeKey, timeValue := range timeoutValues {
-					// validate that we're dealing with the normal CRUD actions
-					var found bool
-					for _, key := range timeoutKeys() {
-						if timeKey == key {
-							found = true
-							break
-						}
-					}
-
-					if !found {
-						return fmt.Errorf("Unsupported Timeout configuration key found (%s)", timeKey)
-					}
-
 					// Get timeout
 					rt, err := time.ParseDuration(timeValue.(string))
 					if err != nil {
@@ -98,9 +85,12 @@ func (t *ResourceTimeout) ConfigDecode(s *Resource, c *terraform.ResourceConfig)
 						timeout = t.Delete
 					case TimeoutDefault:
 						timeout = t.Default
+					default:
+						// validate that we're dealing with the normal CRUD actions
+						return fmt.Errorf("Unsupported Timeout configuration key found (%s)", timeKey)
 					}
 
-					// If the resource has not delcared this in the definition, then error
+					// If the resource has not declared this in the definition, then error
 					// with an unsupported message
 					if timeout == nil {
 						return unsupportedTimeoutKeyError(timeKey)

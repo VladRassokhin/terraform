@@ -11,7 +11,9 @@ const (
 )
 
 var (
+	_VariableTypeHint_index_0 = [...]uint8{0, 12}
 	_VariableTypeHint_index_1 = [...]uint8{0, 12, 23}
+	_VariableTypeHint_index_2 = [...]uint8{0, 14}
 )
 
 func (i VariableTypeHint) String() string {
