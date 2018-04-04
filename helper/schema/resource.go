@@ -8,6 +8,8 @@ import (
 
 	"github.com/hashicorp/terraform/terraform"
 	"github.com/zclconf/go-cty/cty"
+	"strings"
+	"time"
 )
 
 var ReservedDataSourceFields = []string{
@@ -787,7 +789,39 @@ func (r *Resource) SchemasForFlatmapPath(path string) []*Schema {
 // the resources it manages, so you don't need to call this manually if it
 // is part of a Provider.
 func (r *Resource) Export() terraform.SchemaInfo {
-	return schemaMap(r.Schema).Export()
+	info := schemaMap(r.Schema).Export()
+
+	t := r.Timeouts
+	if t != nil {
+		var found []string
+		for _, key := range timeoutKeys() {
+			var timeout *time.Duration
+			switch key {
+			case TimeoutCreate:
+				timeout = t.Create
+			case TimeoutUpdate:
+				timeout = t.Update
+			case TimeoutRead:
+				timeout = t.Read
+			case TimeoutDelete:
+				timeout = t.Delete
+			case TimeoutDefault:
+				timeout = t.Default
+			default:
+				panic("Unsupported timeout key, update switch statement!")
+			}
+			if timeout != nil {
+				found = append(found, key)
+			}
+		}
+
+		if len(found) > 0 {
+			item := terraform.SchemaDefinition{}
+			item.Type = strings.Join(found[:], ",")
+			info["__timeouts__"] = item
+		}
+	}
+	return info
 }
 
 // Returns true if the resource is "top level" i.e. not a sub-resource.
