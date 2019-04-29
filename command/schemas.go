@@ -30,8 +30,8 @@ type providerResourceSchema struct {
 
 type resourceResourceSchema struct {
 	resultBase
-	Provider string               `json:"provider"`
-	Schema   terraform.SchemaInfo `json:"schema"`
+	Provider string                           `json:"provider"`
+	Schema   terraform.SchemaInfoWithTimeouts `json:"schema"`
 }
 
 type provisionerResourceSchemaInfo struct {
