@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"reflect"
 	"strconv"
 
 	"github.com/hashicorp/terraform/config"
@@ -521,40 +522,32 @@ func (r *Resource) TestResourceData() *ResourceData {
 // Provider.ExportSchema() will automatically call this for all of
 // the resources it manages, so you don't need to call this manually if it
 // is part of a Provider.
-func (r *Resource) Export() terraform.SchemaInfo {
+func (r *Resource) ExportWithTimeouts() terraform.SchemaInfoWithTimeouts {
 	info := schemaMap(r.Schema).Export()
 
-	t := r.Timeouts
-	if t != nil {
-		var found []string
-		for _, key := range timeoutKeys() {
-			var timeout *time.Duration
-			switch key {
-			case TimeoutCreate:
-				timeout = t.Create
-			case TimeoutUpdate:
-				timeout = t.Update
-			case TimeoutRead:
-				timeout = t.Read
-			case TimeoutDelete:
-				timeout = t.Delete
-			case TimeoutDefault:
-				timeout = t.Default
-			default:
-				panic("Unsupported timeout key, update switch statement!")
+	var timeouts []string
+	if t := r.Timeouts; t != nil {
+		tp := reflect.ValueOf(*t)
+		for i := 0; i < tp.NumField(); i++ {
+			field := tp.Type().Field(i)
+			val := tp.Field(i)
+			if field.Type == reflect.PtrTo(reflect.TypeOf(time.Nanosecond)) && !val.IsNil() {
+				timeouts = append(timeouts, strings.ToLower(field.Name))
 			}
-			if timeout != nil {
-				found = append(found, key)
-			}
-		}
-
-		if len(found) > 0 {
-			item := terraform.SchemaDefinition{}
-			item.Type = strings.Join(found[:], ",")
-			info["__timeouts__"] = item
 		}
 	}
-	return info
+	result := make(terraform.SchemaInfoWithTimeouts)
+	for nk, nv := range info {
+		result[nk] = nv
+	}
+	if len(timeouts) > 0 {
+		result["__timeouts__"] = timeouts
+	}
+	return result
+}
+
+func (r *Resource) Export() terraform.SchemaInfo {
+	return schemaMap(r.Schema).Export()
 }
 
 // Returns true if the resource is "top level" i.e. not a sub-resource.

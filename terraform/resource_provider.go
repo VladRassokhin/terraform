@@ -217,7 +217,7 @@ type DataSource struct {
 }
 
 type SchemaElement struct {
-	// One of ValueType or "SchemaElements" or "SchemaInfo"
+	// One of "ValueType" or "SchemaElements" or "SchemaInfo"
 	Type string `json:",omitempty"`
 	// Set for simple types (from ValueType)
 	Value string `json:",omitempty"`
@@ -237,6 +237,7 @@ type SchemaDefinition struct {
 	MaxItems      int    `json:",omitempty"`
 	MinItems      int    `json:",omitempty"`
 	PromoteSingle bool   `json:",omitempty"`
+	DefaultFunc   string `json:",omitempty"`
 
 	ComputedWhen  []string `json:",omitempty"`
 	ConflictsWith []string `json:",omitempty"`
@@ -244,17 +245,23 @@ type SchemaDefinition struct {
 	Deprecated string `json:",omitempty"`
 	Removed    string `json:",omitempty"`
 
-	Default SchemaElement `json:",omitempty"`
-	Elem    SchemaElement `json:",omitempty"`
+	Default *SchemaElement `json:",omitempty"`
+	Elem    *SchemaElement `json:",omitempty"`
 }
 
 type SchemaInfo map[string]SchemaDefinition
+type SchemaInfoWithTimeouts map[string]interface{}
 
 // ResourceProviderSchema
 type ResourceProviderSchema struct {
-	Provider    SchemaInfo            `json:"provider"`
-	Resources   map[string]SchemaInfo `json:"resources"`
-	DataSources map[string]SchemaInfo `json:"data-sources"`
+	SchemaVersion string `json:".schema_version"`
+
+	Name        string                            `json:"name"`
+	Type        string                            `json:"type"`
+	Version     string                            `json:"version"`
+	Provider    SchemaInfo                        `json:"provider"`
+	Resources   map[string]SchemaInfoWithTimeouts `json:"resources"`
+	DataSources map[string]SchemaInfoWithTimeouts `json:"data-sources"`
 }
 
 // ResourceProviderResolver is an interface implemented by objects that are

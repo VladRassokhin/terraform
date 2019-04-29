@@ -126,16 +126,20 @@ func isReservedProviderFieldName(name string) bool {
 // of the provider.
 func (p *Provider) Export() (*terraform.ResourceProviderSchema, error) {
 	result := new(terraform.ResourceProviderSchema)
+	result.SchemaVersion = "1"
 
+	result.Name = "__NAME__"
+	result.Type = "provider"
+	result.Version = "__REVISION__"
 	result.Provider = schemaMap(p.Schema).Export()
-	result.Resources = make(map[string]terraform.SchemaInfo)
-	result.DataSources = make(map[string]terraform.SchemaInfo)
+	result.Resources = make(map[string]terraform.SchemaInfoWithTimeouts)
+	result.DataSources = make(map[string]terraform.SchemaInfoWithTimeouts)
 
 	for k, r := range p.ResourcesMap {
-		result.Resources[k] = r.Export()
+		result.Resources[k] = r.ExportWithTimeouts()
 	}
 	for k, ds := range p.DataSourcesMap {
-		result.DataSources[k] = ds.Export()
+		result.DataSources[k] = ds.ExportWithTimeouts()
 	}
 
 	return result, nil

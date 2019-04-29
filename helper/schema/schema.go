@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unsafe"
 
 	"github.com/hashicorp/terraform/terraform"
 	"github.com/mitchellh/copystructure"
@@ -769,12 +770,13 @@ func (m schemaMap) Export() terraform.SchemaInfo {
 	return result
 }
 
-var myDefaultSchema = Schema{}
+var envDefaultFunc = EnvDefaultFunc("", nil)
+var multiEnvDefaultFunc = MultiEnvDefaultFunc([]string{}, nil)
 
 func export(v *Schema) terraform.SchemaDefinition {
 	item := terraform.SchemaDefinition{}
 
-	item.Type = fmt.Sprintf("%s", v.Type)
+	item.Type = shortenType(fmt.Sprintf("%s", v.Type))
 	item.Optional = v.Optional
 	item.Required = v.Required
 	item.Description = v.Description
@@ -792,23 +794,43 @@ func export(v *Schema) terraform.SchemaDefinition {
 		item.Elem = exportValue(v.Elem, fmt.Sprintf("%T", v.Elem))
 	}
 
-	// TODO: Find better solution
-	if defValue, err := v.DefaultValue(); err == nil && defValue != nil && !reflect.DeepEqual(defValue, v.Default) {
+	if defValue := v.Default; defValue != nil {
 		item.Default = exportValue(defValue, fmt.Sprintf("%T", defValue))
+	}
+	if defFunc := v.DefaultFunc; defFunc != nil {
+		if reflect.ValueOf(defFunc).Pointer() == reflect.ValueOf(envDefaultFunc).Pointer() {
+			item.DefaultFunc = getEnvDefaultFuncDescription(defFunc)
+		} else if reflect.ValueOf(defFunc).Pointer() == reflect.ValueOf(multiEnvDefaultFunc).Pointer() {
+			item.DefaultFunc = getMultiEnvDefaultFuncDescription(defFunc)
+		} else {
+			item.DefaultFunc = "UNKNOWN"
+		}
 	}
 	return item
 }
 
-func exportValue(value interface{}, t string) terraform.SchemaElement {
+func shortenType(value string) string {
+	if len(value) > 4 && value[0:4] == "Type" {
+		return value[4:]
+	}
+	return value
+}
+
+func exportValue(value interface{}, t string) *terraform.SchemaElement {
 	s2, ok := value.(*Schema)
 	if ok {
-		return terraform.SchemaElement{Type: "SchemaElements", ElementsType: fmt.Sprintf("%s", s2.Type)}
+		return &terraform.SchemaElement{Type: "SchemaElements", ElementsType: shortenType(fmt.Sprintf("%s", s2.Type))}
 	}
 	r2, ok := value.(*Resource)
 	if ok {
-		return terraform.SchemaElement{Type: "SchemaInfo", Info: r2.Export()}
+		return &terraform.SchemaElement{Type: "SchemaInfo", Info: r2.Export()}
 	}
-	return terraform.SchemaElement{Type: t, Value: fmt.Sprintf("%v", value)}
+	vt, ok := value.(ValueType)
+	if ok {
+		return &terraform.SchemaElement{Value: shortenType(fmt.Sprintf("%v", vt))}
+	}
+	// Unknown case
+	return &terraform.SchemaElement{Type: t, Value: fmt.Sprintf("%v", value)}
 }
 
 func (m schemaMap) diff(
@@ -1693,4 +1715,59 @@ func (t ValueType) Zero() interface{} {
 	default:
 		panic(fmt.Sprintf("unknown type %s", t))
 	}
+}
+
+func getEnvDefaultFuncDescription(df SchemaDefaultFunc) string {
+	return fmt.Sprintf("ENV(%s)", getEnvDefaultFuncArgs(df))
+}
+func getMultiEnvDefaultFuncDescription(df SchemaDefaultFunc) string {
+	return fmt.Sprintf("MENV(%s)", strings.Join(getMultiEnvDefaultFuncArgs(df), ","))
+}
+
+func getEnvDefaultFuncArgs(df SchemaDefaultFunc) string {
+	loc := (uintptr)(unsafe.Pointer(&df))
+	context_ptr := getPointerFromLocation(loc)
+	// (context_ptr) <- closure function
+	// (context_ptr+(uintptr(8))) <- str address
+	// (context_ptr+(uintptr(16))) <- str length
+	str_addr := context_ptr + (uintptr(8))
+	return getString(str_addr)
+}
+
+func getMultiEnvDefaultFuncArgs(df SchemaDefaultFunc) []string {
+	loc := (uintptr)(unsafe.Pointer(&df))
+	context_ptr := getPointerFromLocation(loc)
+	// (context_ptr) <- closure function
+	// (context_ptr+(uintptr(8))) <- []str address
+	// (context_ptr+(uintptr(16))) <- []str length
+	// (context_ptr+(uintptr(24))) <- []str cap
+	str_addr := context_ptr + (uintptr(8))
+	return getSlice(str_addr)
+}
+
+func getPointerFromLocation(location uintptr) uintptr {
+	return *(*uintptr)(unsafe.Pointer(location))
+}
+
+func getString(addr uintptr) string {
+	SH := (*reflect.StringHeader)(unsafe.Pointer(addr))
+
+	var res string
+	pString := (*reflect.StringHeader)(unsafe.Pointer(&res))
+
+	pString.Data = SH.Data
+	pString.Len = SH.Len
+	return res
+}
+
+func getSlice(addr uintptr) []string {
+	SH := (*reflect.SliceHeader)(unsafe.Pointer(addr))
+
+	var res = make([]string, 3)
+	pString := (*reflect.SliceHeader)(unsafe.Pointer(&res))
+
+	pString.Data = SH.Data
+	pString.Len = SH.Len
+	pString.Cap = SH.Len
+	return res
 }
