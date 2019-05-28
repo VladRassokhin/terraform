@@ -96,9 +96,9 @@ func (t *ResourceTimeout) ConfigDecode(s *Resource, c *terraform.ResourceConfig)
 		for _, timeoutValues := range rawTimeouts {
 			for timeKey, timeValue := range timeoutValues {
 				// Get timeout
-					rt, err := time.ParseDuration(timeValue.(string))
-					if err != nil {
-						return fmt.Errorf("Error parsing %q timeout: %s", timeKey, err)
+				rt, err := time.ParseDuration(timeValue.(string))
+				if err != nil {
+					return fmt.Errorf("Error parsing %q timeout: %s", timeKey, err)
 				}
 
 				var timeout *time.Duration
@@ -114,9 +114,9 @@ func (t *ResourceTimeout) ConfigDecode(s *Resource, c *terraform.ResourceConfig)
 				case TimeoutDefault:
 					timeout = t.Default
 				default:
-						// validate that we're dealing with the normal CRUD actions
-						return fmt.Errorf("Unsupported Timeout configuration key found (%s)", timeKey)
-					}
+					// validate that we're dealing with the normal CRUD actions
+					return fmt.Errorf("Unsupported Timeout configuration key found (%s)", timeKey)
+				}
 
 				// If the resource has not declared this in the definition, then error
 				// with an unsupported message
