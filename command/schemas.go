@@ -4,6 +4,9 @@ import (
 	"flag"
 	"github.com/hashicorp/hil"
 	"github.com/hashicorp/hil/ast"
+	"github.com/hashicorp/terraform/backend/init"
+	"github.com/hashicorp/terraform/helper/schema"
+	"github.com/hashicorp/terraform/terraform"
 	"strings"
 )
 
@@ -39,6 +42,11 @@ type functionSchema struct {
 type functionsSchema struct {
 	resultBase
 	Functions map[string]FunctionInfo `json:"schema"`
+}
+
+type backendSchema struct {
+	resultBase
+	Schema terraform.SchemaInfo `json:"schema"`
 }
 
 func (c *SchemasCommand) Run(args []string) int {
@@ -133,6 +141,10 @@ func getAnythingOrErrorResult(name string) interface{} {
 	if s != nil {
 		return s
 	}
+	s = getBackendSchema(name)
+	if s != nil {
+		return s
+	}
 	return errorResult{resultBase{name, "unknown"}, "Not found"}
 }
 
@@ -187,4 +199,30 @@ func getFunctionSchema(name string) interface{} {
 		return nil
 	}
 	return functionSchema{resultBase{name, "function"}, *function}
+}
+
+func getBackend(name string) (*terraform.SchemaInfo, bool) {
+	fn := init.Backend(name)
+	if fn == nil {
+		return nil, false
+	}
+	backend := fn()
+
+	if b, isSchemaBackend := (backend.(interface{})).(*schema.Backend); isSchemaBackend {
+		im := schema.InternalMap(b.Schema)
+		info := im.Export()
+		return &info, true
+	} else {
+		s := backend.ConfigSchema()
+		info := schema.ExportBlock(s)
+		return &info, true
+	}
+}
+
+func getBackendSchema(name string) interface{} {
+	backend, found := getBackend(name)
+	if !found {
+		return nil
+	}
+	return backendSchema{resultBase{name, "backend"}, *backend}
 }

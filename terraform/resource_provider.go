@@ -190,7 +190,7 @@ type DataSource struct {
 }
 
 type SchemaElement struct {
-	// One of "ValueType" or "SchemaElements" or "SchemaInfo"
+	// One of "schema.ValueType" or "SchemaElements" or "SchemaInfo"
 	Type string `json:",omitempty"`
 	// Set for simple types (from ValueType)
 	Value string `json:",omitempty"`
@@ -217,6 +217,11 @@ type SchemaDefinition struct {
 
 	Deprecated string `json:",omitempty"`
 	Removed    string `json:",omitempty"`
+
+	IsBlock bool `json:",omitempty"`
+
+	ConfigExplicitMode string `json:",omitempty"`
+	ConfigImplicitMode string `json:",omitempty"`
 
 	Default *SchemaElement `json:",omitempty"`
 	Elem    *SchemaElement `json:",omitempty"`

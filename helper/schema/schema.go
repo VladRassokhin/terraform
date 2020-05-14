@@ -14,6 +14,9 @@ package schema
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/terraform/configs/configschema"
+	"github.com/hashicorp/terraform/providers"
+	"github.com/zclconf/go-cty/cty"
 	"os"
 	"reflect"
 	"regexp"
@@ -934,6 +937,87 @@ func exportValue(value interface{}, t string) *terraform.SchemaElement {
 	}
 	// Unknown case
 	return &terraform.SchemaElement{Type: t, Value: fmt.Sprintf("%v", value)}
+}
+
+// helpers for new cty.Type schemas
+func MapToSchemaInfo(s providers.Schema) terraform.SchemaInfo {
+	block := s.Block
+	var result terraform.SchemaInfo
+	if block != nil {
+		result = ExportBlock(block)
+	} else {
+		result = make(terraform.SchemaInfo)
+	}
+	result[".version"] = s.Version
+	return result
+}
+
+func exportAttribute(v *configschema.Attribute) terraform.SchemaDefinition {
+	item := terraform.SchemaDefinition{}
+
+	item.Type, item.Elem = exportType(v.Type)
+	item.Optional = v.Optional
+	item.Required = v.Required
+	item.Description = v.Description
+	item.Computed = v.Computed
+	item.IsBlock = false
+	item.ConfigImplicitMode = "Attr"
+	return item
+}
+
+func exportType(t cty.Type) (string, *terraform.SchemaElement) {
+	//return shortenType(t.GoString())
+	if t.IsPrimitiveType() {
+		return t.FriendlyName(), nil
+	}
+	if t.Equals(cty.DynamicPseudoType) {
+		return "Any", nil
+	}
+
+	if t.IsListType() {
+		fmt.Sprintf("%T", t.ListElementType())
+		return "List", nil
+	}
+	if t.IsSetType() {
+	}
+
+	panic(fmt.Errorf("invalid type %#v", t))
+}
+
+func ExportBlock(block *configschema.Block) terraform.SchemaInfo {
+	result := make(terraform.SchemaInfo)
+	for name, attr := range block.Attributes {
+		result[name] = exportAttribute(attr)
+	}
+	for name, blk := range block.BlockTypes {
+		result[name] = exportNestedBlock(blk)
+	}
+	return result
+}
+
+func exportNestedBlock(v *configschema.NestedBlock) terraform.SchemaDefinition {
+	item := terraform.SchemaDefinition{}
+
+	item.MinItems = v.MinItems
+	item.MaxItems = v.MaxItems
+	switch v.Nesting {
+	case configschema.NestingSingle:
+		item.Type = "Single"
+	case configschema.NestingGroup:
+		item.Type = "Group"
+	case configschema.NestingList:
+		item.Type = "List"
+	case configschema.NestingSet:
+		item.Type = "Set"
+	case configschema.NestingMap:
+		item.Type = "Map"
+	}
+
+	item.Elem = &terraform.SchemaElement{Type: "SchemaInfo", Info: ExportBlock(&v.Block)}
+
+	item.IsBlock = true
+	item.ConfigImplicitMode = "Block"
+	return item
 }
 
 func (m schemaMap) diff(

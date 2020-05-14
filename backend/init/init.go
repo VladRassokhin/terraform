@@ -80,6 +80,14 @@ func Init(services *disco.Disco) {
 	}
 }
 
+func GetAllNames() []string {
+	keys := make([]string, len(backends))
+	for key, _ := range backends {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
 // Backend returns the initialization factory for the given backend, or
 // nil if none exists.
 func Backend(name string) backend.InitFn {
